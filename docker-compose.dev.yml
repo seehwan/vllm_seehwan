@@ -1,0 +1,53 @@
+# 개발용 Docker Compose 오버라이드
+version: '3.9'
+
+services:
+  vllm:
+    # 개발용으로 리소스 제한
+    command: >
+      --model ${MODEL_ID}
+      --dtype float16
+      --max-model-len 2048
+      --tensor-parallel-size 1
+      --gpu-memory-utilization 0.3
+      --host 0.0.0.0
+      --port 8000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  frontend:
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:${GATEWAY_PORT}
+      - NODE_ENV=development
+
+  gateway:
+    volumes:
+      - ./gateway:/app
+    command: sh -c "pip install -r requirements.txt && uvicorn app.main:app --reload --host 0.0.0.0 --port 8080"
+    environment:
+      - VLLM_BASE_URL=http://vllm:8000/v1
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}/${POSTGRES_DB}
+      - REDIS_URL=${REDIS_URL}
+      - CORS_ORIGINS=${CORS_ORIGINS}
+      - LOG_LEVEL=DEBUG
+      - PYTHONPATH=/app
+
+  # 개발용 추가 서비스
+  adminer:
+    image: adminer
+    container_name: adminer-db
+    restart: unless-stopped
+    ports:
+      - '8081:8080'
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres
