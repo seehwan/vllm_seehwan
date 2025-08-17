@@ -2,19 +2,60 @@
 
 이 문서는 vLLM 기반 챗봇 서비스의 일상적인 운영, 모니터링, 유지보수를 위한 실무 가이드입니다.
 
-## 📊 일일 운영 체크리스트
+## �️ 시스템 관리 스크립트
+
+### 빠른 시작/정지
+```bash
+# 프로젝트 루트에서 실행 (권장)
+./start          # 시스템 시작
+./stop           # 시스템 정지  
+./status         # 상태 확인
+```
+
+### 상세 관리 명령어
+```bash
+# 전체 시스템 관리
+./scripts/start.sh        # 시스템 시작 (상세 출력)
+./scripts/stop.sh         # 시스템 정지
+./scripts/restart.sh      # 시스템 재시작
+./scripts/cleanup.sh      # 완전 정리 (데이터 삭제 주의!)
+
+# 모니터링 및 디버깅  
+./scripts/status.sh       # 상태, GPU, 리소스 확인
+./scripts/logs.sh         # 전체 로그 확인
+./scripts/logs.sh vllm    # vLLM 로그만 확인
+./scripts/logs.sh gateway # Gateway 로그만 확인
+
+# 성능 및 설치
+./scripts/benchmark.sh    # 성능 벤치마크
+./scripts/setup.sh        # 초기 시스템 설정
+```
+
+### 개별 서비스 제어
+```bash
+# Docker Compose로 개별 서비스 관리
+sg docker -c "docker-compose --env-file .env.local restart vllm"
+sg docker -c "docker-compose --env-file .env.local restart gateway"  
+sg docker -c "docker-compose --env-file .env.local stop frontend"
+sg docker -c "docker-compose --env-file .env.local start postgres"
+```
+
+## �📊 일일 운영 체크리스트
 
 ### 🌅 아침 체크 (운영 시작)
 
 ```bash
 # 1. 전체 서비스 상태 확인
-docker compose ps
+./status
+
+# 또는 직접 확인
+sg docker -c "docker-compose --env-file .env.local ps"
 
 # 2. 헬스체크 수행
 curl -f http://localhost:8080/health
 curl -f http://localhost:8000/v1/models
 
-# 3. GPU 상태 확인
+# 3. GPU 상태 확인  
 nvidia-smi
 
 # 4. 디스크 용량 확인
@@ -24,29 +65,30 @@ df -h
 free -h
 
 # 6. 지난 밤 에러 로그 확인
-docker compose logs --since 24h | grep -i error
+./scripts/logs.sh | grep -i error
 ```
 
 ### 🌙 저녁 체크 (운영 종료 전)
 
 ```bash
 # 1. 오늘 하루 사용량 통계
-docker compose exec postgres psql -U ${POSTGRES_USER} -d ${POSTGRES_DB} -c "
+sg docker -c "docker-compose --env-file .env.local exec postgres psql -U chatuser -d chatdb_test -c \"
 SELECT
     COUNT(*) as total_requests,
-    AVG(latency_ms) as avg_latency,
+    AVG(response_time_ms) as avg_latency,
     COUNT(CASE WHEN status_code >= 400 THEN 1 END) as errors
-FROM request_logs
-WHERE created_at >= CURRENT_DATE;"
+FROM conversations
+WHERE created_at >= CURRENT_DATE;\""
 
-# 2. 로그 로테이션
-docker compose logs --no-color > "logs/app_$(date +%Y%m%d).log"
+# 2. 로그 백업
+mkdir -p logs
+./scripts/logs.sh > "logs/app_$(date +%Y%m%d).log"
 
-# 3. 데이터베이스 백업
-./scripts/backup_database.sh
-
-# 4. GPU 온도 및 사용률 최종 확인
+# 3. GPU 온도 및 사용률 최종 확인
 nvidia-smi
+
+# 4. 시스템 상태 최종 확인
+./status
 ```
 
 ## 📈 모니터링 및 알림

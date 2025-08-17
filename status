@@ -1,0 +1,3 @@
+#!/bin/bash
+# vLLM 챗봇 시스템 상태 확인
+./scripts/status.sh

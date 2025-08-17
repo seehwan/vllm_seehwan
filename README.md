@@ -212,6 +212,7 @@ services:
 
 ### 7.7 자주 겪는 이슈
 
+- **vLLM 서비스 불안정**: 간헐적 Exit 1 상태, NCCL 통신 오류로 인한 재시작 발생 가능
 - OOM/부팅 실패: `VLLM_UTIL`↓, `VLLM_MAXLEN`↓, `--swap-space 8`
 - GPU0 점유: vLLM을 GPU1로 고정
 - 모델 404/권한: 모델 ID 확인·HF 토큰 사용
@@ -414,6 +415,55 @@ Content-Type: application/json") \
 
 ---
 
+## 🚀 시스템 관리 (Quick Start)
+
+### 빠른 시작/정지
+```bash
+# 시스템 시작
+./start
+
+# 시스템 정지
+./stop
+
+# 상태 확인
+./status
+```
+
+### 상세 관리 스크립트
+```bash
+# 전체 시스템 관리
+./scripts/start.sh        # 시스템 시작 (상세 출력)
+./scripts/stop.sh         # 시스템 정지
+./scripts/restart.sh      # 시스템 재시작
+./scripts/cleanup.sh      # 완전 정리 (데이터 삭제 주의!)
+
+# 모니터링 및 디버깅
+./scripts/status.sh       # 시스템 상태, GPU 사용량, 리소스 확인
+./scripts/logs.sh         # 전체 로그 확인
+./scripts/logs.sh vllm    # 특정 서비스 로그 확인
+./scripts/logs.sh gateway # Gateway 로그 확인
+
+# 성능 및 설치
+./scripts/benchmark.sh    # 성능 벤치마크 테스트
+./scripts/setup.sh        # 시스템 초기 설정
+```
+
+### 접속 정보
+- **Frontend**: http://localhost:3000 (사용자 인터페이스)
+- **Gateway API**: http://localhost:8080 (백엔드 API) 
+- **vLLM API**: http://localhost:8000 (모델 API)
+- **nginx Proxy**: http://localhost:80 (통합 게이트웨이)
+
+### Docker Compose 직접 사용
+```bash
+# 환경 파일과 함께 실행
+sg docker -c "docker-compose --env-file .env.local up -d"
+sg docker -c "docker-compose --env-file .env.local down"
+sg docker -c "docker-compose --env-file .env.local logs --follow vllm"
+```
+
+---
+
 ## 변경 이력
 
 - **v1.1 (2025-08-16)**: SW 서비스 개발기획 일반 구조에 맞춰 **재작성**, 섹션/번호 체계 정비, 운영·보안·성능 가이드 정돈
@@ -437,6 +487,6 @@ Content-Type: application/json") \
 ### **시스템 이해를 위한 문서**
 - **[아키텍처 가이드](./ARCHITECTURE.md)** - 시스템 설계 및 기술적 결정 사항
 - **[성능 테스트 가이드](./k6/K6_GUIDE.md)** - 부하 테스트 및 성능 최적화
-- **[배포 스크립트 가이드](./scripts/SCRIPTS_GUIDE.md)** - 자동화 도구 및 유틸리티
+- **[시스템 관리 스크립트](./scripts/README.md)** 🆕 - 자동화 도구 및 유틸리티 상세 가이드
 
 > **💡 문서 읽기 권장 순서**: README → GETTING_STARTED → DEVELOPER_ONBOARDING → 각 모듈별 가이드

@@ -1,0 +1,3 @@
+#!/bin/bash
+# vLLM 챗봇 시스템 시작
+./scripts/start.sh
