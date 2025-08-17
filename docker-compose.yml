@@ -7,7 +7,8 @@ services:
     restart: "no"  # 모델 전환 시 수동 재시작을 위해 변경
     ipc: host
     shm_size: '2gb'
-    network_mode: host
+    ports:
+      - "8000:8000"
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
       - ./models:/models
@@ -48,6 +49,15 @@ services:
     volumes:
       - ./model_profiles.yml:/app/model_profiles.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro  # Docker 컨테이너 제어를 위해 추가
+      - /usr/bin/nvidia-smi:/usr/bin/nvidia-smi:ro  # nvidia-smi 바이너리
+      - /usr/lib/x86_64-linux-gnu/libnvidia-ml.so.575.64.03:/usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1:ro  # NVIDIA ML 라이브러리
+    devices:
+      - /dev/nvidiactl:/dev/nvidiactl        # NVIDIA 제어 디바이스
+      - /dev/nvidia0:/dev/nvidia0            # GPU 0 디바이스
+      - /dev/nvidia1:/dev/nvidia1            # GPU 1 디바이스
+      - /dev/nvidia-modeset:/dev/nvidia-modeset  # NVIDIA modeset 디바이스
+      - /dev/nvidia-uvm:/dev/nvidia-uvm      # NVIDIA UVM 디바이스
+      - /dev/nvidia-uvm-tools:/dev/nvidia-uvm-tools  # NVIDIA UVM tools
     environment:
       - VLLM_BASE_URL=${VLLM_BASE_URL}
       - JWT_SECRET=${JWT_SECRET}

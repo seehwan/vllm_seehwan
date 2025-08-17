@@ -28,8 +28,16 @@ body {
 
 #root {
   width: 100%;
-  margin: 0;
-  text-align: left;
+  height: 100vh;
+}
+
+/* 텍스트 줄임표시를 위한 클래스 */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 @media (prefers-color-scheme: light) {

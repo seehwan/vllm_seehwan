@@ -30,7 +30,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   const isDisabled = !selectedModel;
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-lg border shadow-sm">
+    <div className="h-full bg-white rounded-lg border shadow-sm flex flex-col overflow-hidden">
       {/* 헤더 */}
       <div className="p-4 bg-white border-b rounded-t-lg flex-shrink-0">
         <div className="flex items-center justify-between">
@@ -51,7 +51,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         </div>
       </div>
 
-      {/* 메시지 영역 */}
+      {/* 메시지 영역 - 스크롤 가능 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 ? (
           <div className="text-center py-12">

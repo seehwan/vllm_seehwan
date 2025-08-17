@@ -21,6 +21,7 @@ class VLLMModelManager:
         self.profiles: dict[str, ModelProfile] = {}
         self.hardware_profiles: dict = {}
         self.vllm_process: Optional[subprocess.Popen] = None
+        self._cached_hardware_info: Optional[dict] = None  # 캐시된 하드웨어 정보
         self.load_profiles()
 
     def load_profiles(self):
@@ -57,8 +58,24 @@ class VLLMModelManager:
 
     async def get_status(self) -> ModelStatusResponse:
         """현재 모델 상태 반환"""
-        # 하드웨어 정보 추가
-        hardware_info = await self._get_hardware_info()
+        logger.info("=== get_status 함수 호출됨 ===")
+        # vLLM 서버 실제 상태 확인
+        await self._check_vllm_status()
+        
+        # 하드웨어 정보 추가 - 실패시 예외 발생
+        try:
+            hardware_info = await self._get_hardware_info()
+        except RuntimeError as e:
+            logger.error(f"하드웨어 정보 조회 실패로 인한 서비스 중단: {e}")
+            # 서비스 상태를 error로 설정
+            self.status = "error"
+            return ModelStatusResponse(
+                current_profile=self.current_profile,
+                status="error",
+                available_profiles=self.profiles,
+                message=f"서비스 오류: {str(e)}",
+                hardware_info=None
+            )
 
         return ModelStatusResponse(
             current_profile=self.current_profile,
@@ -69,9 +86,10 @@ class VLLMModelManager:
         )
 
     async def _get_hardware_info(self) -> dict:
-        """하드웨어 정보 조회"""
+        """하드웨어 정보 조회 - 호스트의 nvidia-smi 사용"""
+        # 먼저 직접 nvidia-smi 실행 시도 (컨테이너 내에서 가능하도록 설정됨)
         try:
-            # nvidia-smi로 GPU 정보 조회
+            logger.info("직접 nvidia-smi 실행 시도")
             process = await asyncio.create_subprocess_exec(
                 "nvidia-smi", "--query-gpu=name,memory.total,memory.used,memory.free",
                 "--format=csv,noheader,nounits",
@@ -81,6 +99,7 @@ class VLLMModelManager:
             stdout, stderr = await process.communicate()
 
             if process.returncode == 0:
+                logger.info("직접 nvidia-smi 실행 성공")
                 gpus = []
                 for line in stdout.decode().strip().split('\n'):
                     if line.strip():
@@ -93,21 +112,107 @@ class VLLMModelManager:
                                 "memory_free_mb": int(parts[3])
                             })
 
-                return {
+                hardware_info = {
                     "gpus": gpus,
                     "gpu_count": len(gpus),
                     "total_vram_gb": sum(gpu["memory_total_mb"] for gpu in gpus) / 1024,
                     "available_vram_gb": sum(gpu["memory_free_mb"] for gpu in gpus) / 1024
                 }
+                
+                # 성공한 결과를 캐시
+                self._cached_hardware_info = hardware_info
+                logger.info(f"하드웨어 정보 성공적으로 조회: {len(gpus)}개 GPU")
+                return hardware_info
+            else:
+                logger.warning(f"직접 nvidia-smi 실행 실패 - returncode: {process.returncode}, stderr: {stderr.decode()}")
         except Exception as e:
-            logger.error(f"하드웨어 정보 조회 실패: {e}")
+            logger.warning(f"직접 nvidia-smi 실행 실패: {e}")
 
-        return {
-            "gpus": [],
-            "gpu_count": 0,
-            "total_vram_gb": 0,
-            "available_vram_gb": 0
-        }
+        # Docker 방법으로 백업 시도 (필요시)
+        try:
+            logger.info("Docker를 통한 nvidia-smi 실행 시도")
+            process = await asyncio.create_subprocess_exec(
+                "docker", "run", "--rm", "--gpus=all", 
+                "nvidia/cuda:12.1-runtime-ubuntu22.04",
+                "nvidia-smi", "--query-gpu=name,memory.total,memory.used,memory.free",
+                "--format=csv,noheader,nounits",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
+            )
+            stdout, stderr = await process.communicate()
+
+            if process.returncode == 0:
+                logger.info("Docker nvidia-smi 실행 성공")
+                gpus = []
+                for line in stdout.decode().strip().split('\n'):
+                    if line.strip():
+                        parts = [p.strip() for p in line.split(',')]
+                        if len(parts) >= 4:
+                            gpus.append({
+                                "name": parts[0],
+                                "memory_total_mb": int(parts[1]),
+                                "memory_used_mb": int(parts[2]),
+                                "memory_free_mb": int(parts[3])
+                            })
+
+                hardware_info = {
+                    "gpus": gpus,
+                    "gpu_count": len(gpus),
+                    "total_vram_gb": sum(gpu["memory_total_mb"] for gpu in gpus) / 1024,
+                    "available_vram_gb": sum(gpu["memory_free_mb"] for gpu in gpus) / 1024
+                }
+                
+                # 성공한 결과를 캐시
+                self._cached_hardware_info = hardware_info
+                return hardware_info
+            else:
+                logger.warning(f"Docker nvidia-smi 실행 실패: {stderr.decode()}")
+        except Exception as e:
+            logger.warning(f"Docker 하드웨어 정보 조회 실패: {e}")
+
+        # 캐시된 정보가 있으면 사용
+        if self._cached_hardware_info:
+            logger.info("nvidia-smi 사용 불가, 캐시된 하드웨어 정보 사용")
+            return self._cached_hardware_info
+
+        # 모든 방법 실패시 서비스 실패 처리
+        error_msg = "nvidia-smi를 통한 하드웨어 정보 조회에 실패했습니다. 서비스를 사용할 수 없습니다."
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
+
+    async def _check_vllm_status(self):
+        """vLLM 서버 실제 상태 확인"""
+        logger.info("vLLM 상태 확인 시작")
+        try:
+            import httpx
+            async with httpx.AsyncClient() as client:
+                logger.info("vLLM API 호출 중...")
+                response = await client.get("http://vllm-server:8000/v1/models", timeout=3.0)
+                logger.info(f"vLLM API 응답: {response.status_code}")
+                
+                if response.status_code == 200:
+                    models_data = response.json()
+                    logger.info(f"모델 데이터: {models_data}")
+                    
+                    if models_data.get("data") and len(models_data["data"]) > 0:
+                        # 실행 중인 모델 정보로 현재 프로파일 업데이트
+                        model_id = models_data["data"][0]["id"]
+                        logger.info(f"실행 중인 모델: {model_id}")
+                        
+                        for profile_id, profile in self.profiles.items():
+                            if profile.model_id == model_id:
+                                self.current_profile = profile_id
+                                logger.info(f"현재 프로파일 업데이트: {profile_id}")
+                                break
+                        self.status = "running"
+                        logger.info("vLLM 상태: 실행 중")
+                        return
+        except Exception as e:
+            logger.error(f"vLLM 상태 확인 중 오류: {e}")
+        
+        # API 호출 실패 시 정지 상태로 설정
+        self.status = "stopped"
+        logger.info("vLLM 상태: 정지됨")
 
     async def switch_model(self, profile_id: str) -> bool:
         """모델 전환"""
@@ -116,7 +221,12 @@ class VLLMModelManager:
 
         # 하드웨어 호환성 검증
         profile = self.profiles[profile_id]
-        hardware_info = await self._get_hardware_info()
+        
+        try:
+            hardware_info = await self._get_hardware_info()
+        except RuntimeError as e:
+            logger.error(f"하드웨어 정보 조회 실패로 인한 모델 전환 중단: {e}")
+            raise ValueError(f"하드웨어 정보 조회 실패: {str(e)}")
 
         compatibility_check = self._check_hardware_compatibility(profile, hardware_info)
         if not compatibility_check["compatible"]:
@@ -246,7 +356,7 @@ class VLLMModelManager:
         for _ in range(timeout // 5):
             try:
                 async with httpx.AsyncClient() as client:
-                    response = await client.get("http://localhost:8000/v1/models", timeout=5.0)
+                    response = await client.get("http://vllm-server:8000/v1/models", timeout=5.0)
                     if response.status_code == 200:
                         logger.info("vLLM 서버 준비 완료")
                         return

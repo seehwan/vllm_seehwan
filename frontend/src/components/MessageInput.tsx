@@ -49,7 +49,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
   };
 
   return (
-    <div className="border-t bg-white p-4">
+    <div className="border-t bg-white p-4 flex-shrink-0">
       {/* 에러 메시지나 상태 표시 */}
       {disabled && (
         <div className="mb-3 p-3 bg-yellow-50 border border-yellow-200 rounded-md">

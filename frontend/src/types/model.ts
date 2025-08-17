@@ -1,3 +1,9 @@
+export interface HardwareRequirements {
+  min_vram_gb: number;
+  recommended_vram_gb?: number;
+  min_gpus?: number;
+}
+
 export interface ModelProfile {
   name: string;
   model_id: string;
@@ -7,6 +13,7 @@ export interface ModelProfile {
   gpu_memory_utilization: number;
   dtype: string;
   swap_space: number;
+  hardware_requirements?: HardwareRequirements;
 }
 
 export interface ModelStatus {

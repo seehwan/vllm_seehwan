@@ -13,7 +13,10 @@ router = APIRouter()
 async def get_model_status():
     """현재 모델 상태 조회"""
     try:
-        return await model_manager.get_status()
+        logger.info("=== 모델 상태 API 호출됨 ===")
+        result = await model_manager.get_status()
+        logger.info(f"모델 상태 결과: {result.status}")
+        return result
     except Exception as e:
         logger.error(f"모델 상태 조회 실패: {e}")
         raise HTTPException(status_code=500, detail="모델 상태 조회 실패")
