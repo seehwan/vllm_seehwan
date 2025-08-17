@@ -42,9 +42,9 @@ function App() {
         </header>
 
         {/* 아래쪽 - 좌우 분할 */}
-        <main className="grid grid-cols-[320px_1fr] gap-6 flex-1 min-h-0 overflow-hidden">
+        <main className="flex gap-6 flex-1 min-h-0 overflow-hidden">
           {/* 아래쪽-왼쪽 - 모델 선택 패널 */}
-          <div className="h-full overflow-hidden">
+          <div className="w-80 flex-shrink-0 h-full overflow-hidden">
             <ModelSelector 
               onModelChange={handleModelChange} 
               selectedModel={selectedModel}
@@ -52,7 +52,7 @@ function App() {
           </div>
 
           {/* 아래쪽-오른쪽 - 채팅창 */}
-          <div className="h-full overflow-hidden">
+          <div className="flex-1 h-full overflow-hidden">
             <ChatArea
               messages={messages}
               isLoading={isLoading}
