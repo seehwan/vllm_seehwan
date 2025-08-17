@@ -40,8 +40,10 @@ const testPrompts = [
 ]
 
 const models = [
-  'microsoft/DialoGPT-medium',
-  // 추가 모델이 있으면 여기에 추가
+  'current', // 현재 활성화된 모델 사용
+  // 'deepseek-r1-distill-qwen-14b', // 특정 모델 지정 시
+  // 'deepseek-coder-7b',
+  // 'phi3-mini',
 ]
 
 export function setup() {

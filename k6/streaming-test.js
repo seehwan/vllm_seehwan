@@ -33,7 +33,7 @@ export default function (data) {
           'Write a detailed explanation about machine learning algorithms. Please provide examples and use cases.',
       },
     ],
-    model: 'microsoft/DialoGPT-medium',
+    model: 'current', // 현재 활성화된 모델 사용
     temperature: 0.7,
     max_tokens: 500,
     stream: true,
