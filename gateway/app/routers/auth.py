@@ -113,9 +113,22 @@ def get_user(username: str):
 
 def authenticate_user(username: str, password: str):
     """사용자 인증"""
+    logger.debug(f"인증 시도: username={username}")
+    
     user = get_user(username)
-    if not user or not verify_password(password, user["hashed_password"]):
+    if not user:
+        logger.warning(f"사용자를 찾을 수 없음: {username}")
         return False
+        
+    logger.debug(f"사용자 찾음: {username}")
+    password_valid = verify_password(password, user["hashed_password"])
+    logger.debug(f"비밀번호 검증 결과: {password_valid}")
+    
+    if not password_valid:
+        logger.warning(f"비밀번호 불일치: {username}")
+        return False
+        
+    logger.info(f"인증 성공: {username}")
     return user
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):

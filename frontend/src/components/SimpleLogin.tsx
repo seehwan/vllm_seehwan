@@ -15,12 +15,12 @@ export const SimpleLogin: React.FC<SimpleLoginProps> = ({ onLogin }) => {
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/login-form', {
+      const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Type': 'application/json',
         },
-        body: new URLSearchParams(credentials),
+        body: JSON.stringify(credentials),
       });
 
       if (!response.ok) {
