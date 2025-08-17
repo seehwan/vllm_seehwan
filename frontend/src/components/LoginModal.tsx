@@ -35,7 +35,7 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
         },
         body: JSON.stringify({
           username,
-          password,
+          password: btoa(password), // Base64 인코딩
         }),
       });
 

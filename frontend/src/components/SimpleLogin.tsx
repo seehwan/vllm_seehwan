@@ -15,12 +15,18 @@ export const SimpleLogin: React.FC<SimpleLoginProps> = ({ onLogin }) => {
     setError(null);
 
     try {
+      // 패스워드를 Base64로 인코딩
+      const encodedCredentials = {
+        username: credentials.username,
+        password: btoa(credentials.password) // Base64 인코딩
+      };
+      
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(credentials),
+        body: JSON.stringify(encodedCredentials),
       });
 
       if (!response.ok) {

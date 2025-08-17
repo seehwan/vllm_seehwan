@@ -8,6 +8,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 import httpx
 import structlog
+import base64
 from ..config import settings
 
 # OAuth 관련 import는 조건부로 처리
@@ -205,12 +206,20 @@ async def verify_token(credentials: Optional[HTTPAuthorizationCredentials] = Dep
 async def login(login_request: LoginRequest):
     """사용자 로그인 및 JWT 토큰 발급"""
     try:
+        # Base64로 인코딩된 패스워드 디코딩
+        try:
+            decoded_password = base64.b64decode(login_request.password).decode('utf-8')
+            logger.info(f"패스워드 Base64 디코딩 성공: 원본 길이={len(login_request.password)}, 디코딩 길이={len(decoded_password)}")
+        except Exception as e:
+            logger.info(f"패스워드 Base64 디코딩 실패, 원본 사용: {e}")
+            decoded_password = login_request.password
+        
         # 개발 환경에서는 간단한 인증
         if settings.DEBUG or settings.ENVIRONMENT == "development":
             logger.info(f"개발 환경 로그인 시도: {login_request.username}")
             
             # 개발 환경에서도 기본적인 사용자 검증
-            user = authenticate_user(login_request.username, login_request.password)
+            user = authenticate_user(login_request.username, decoded_password)
             if not user:
                 logger.warning(f"로그인 실패: {login_request.username}")
                 raise HTTPException(
@@ -220,7 +229,7 @@ async def login(login_request: LoginRequest):
                 )
         else:
             # 프로덕션 환경에서는 완전한 인증
-            user = authenticate_user(login_request.username, login_request.password)
+            user = authenticate_user(login_request.username, decoded_password)
             if not user:
                 logger.warning(f"로그인 실패: {login_request.username}")
                 raise HTTPException(
