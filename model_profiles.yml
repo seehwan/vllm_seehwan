@@ -9,7 +9,7 @@ model_profiles:
     description: "최신 DeepSeek R1 distilled 모델, 고성능 추론 및 코딩 작업"
     max_model_len: 8192
     tensor_parallel_size: 2  # 14B 모델이므로 2-GPU 권장
-    gpu_memory_utilization: 0.85
+    gpu_memory_utilization: 0.95
     dtype: "float16"
     swap_space: 6
     hardware_requirements:

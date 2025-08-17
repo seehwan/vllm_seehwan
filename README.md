@@ -17,18 +17,21 @@
 - **React**: 프론트엔드 UI, API 연동 준비
 - **PostgreSQL/Redis**: 데이터베이스 연결 확인
 
-### 📊 테스트 결과
-- **헬스체크**: `GET /health` → `{"status":"ok","services":{"database":"connected","vllm":"connected"}}`
-- **JWT 토큰**: `POST /auth/token` → 30분 유효기간 토큰 발급 성공
-- **인증 보호**: `GET /api/models` → Bearer 토큰 검증 정상 동작
-- **하드웨어**: nvidia-smi 컨테이너 실행, GPU 정보 수집 성공
+### 📊 테스트 결과 (최신 검증)
+- **헬스체크**: `GET /health` → `{"status":"healthy","service":"vLLM Chat Gateway","version":"1.0.0"}`
+- **JWT 로그인**: `POST /api/auth/login` → 올바른 엔드포인트 확인, 토큰 발급 성공
+- **실제 채팅**: vLLM API 직접 호출 및 Gateway 통한 채팅 완성 응답 확인
+- **GPU 사용률**: RTX 3090 × 2 (각각 87% 사용률, 모델 정상 로딩)
+- **API 수정사항**: 
+  - 인증 엔드포인트: `/auth/token` → `/api/auth/login`
+  - 테스트 계정: `admin/secret` → `admin/admin123`
 
 ---
 
 ## 문서 정보
 
-- **버전**: v1.2 (구현 반영)
-- **작성일**: 2025-08-16 (Asia/Seoul)
+- **버전**: v1.3 (API 검증 및 수정사항 반영)
+- **작성일**: 2025-08-17 (Asia/Seoul)
 - **소유/검토**: PM · Tech Lead · MLOps · Frontend Lead · Backend Lead
 - **적용 범위**: 개발(MVP) → 운영(단일 노드) → 확장(멀티 노드)
 
@@ -304,17 +307,18 @@ CREATE TABLE requests (
 ### 9.1 JWT 인증 시스템
 
 #### 인증 엔드포인트
-- `POST /auth/token` — 로그인 및 토큰 발급
-  - 바디: `{ username: "string", password: "string" }`
-  - 응답: `{ access_token: "jwt_token", token_type: "bearer" }`
+- `POST /api/auth/login` — 로그인 및 토큰 발급
+  - 바디: `{ "username": "string", "password": "string" }`
+  - 응답: `{ "access_token": "jwt_token", "token_type": "bearer" }`
   - 토큰 유효기간: 30분
   
-- `GET /auth/verify` — 토큰 검증 (개발용)
+- `GET /api/auth/verify` — 토큰 검증 (개발용)
   - 헤더: `Authorization: Bearer <token>`
-  - 응답: `{ username: "string", exp: timestamp }`
+  - 응답: `{ "username": "string", "exp": timestamp }`
 
 #### 테스트 계정
-- 사용자명: `admin`, 비밀번호: `secret`
+- 사용자명: `admin`, 비밀번호: `admin123`
+- 추가 계정: `test` / `test`
 - JWT 알고리즘: HS256
 - 비밀번호 해시: BCrypt
 
@@ -327,13 +331,13 @@ CREATE TABLE requests (
 #### 채팅 API
 - `POST /api/chat` — 채팅 완성 (SSE 스트리밍)
   - 헤더: `Authorization: Bearer <token>`
-  - 바디: `{ messages: [], model?: "string", temperature?: number }`
+  - 바디: `{ "messages": [], "model": "string", "temperature": number, "max_tokens": number }`
   - 응답: vLLM `/v1/chat/completions` 프록시 (Server-Sent Events)
 
 #### 모델 관리 API
 - `GET /api/models` — 사용 가능한 모델 목록
   - 헤더: `Authorization: Bearer <token>`
-  - 응답: `{ models: [{ id: "string", name: "string" }] }`
+  - 응답: `{ "models": [{ "id": "string", "name": "string" }] }`
 
 #### 대화 관리 API
 - `GET /api/conversations/:id` — 대화 로드
@@ -347,20 +351,35 @@ CREATE TABLE requests (
 ### 9.3 서비스 연결 상태 (검증완료)
 
 ```bash
-# Gateway API 상태
+# Gateway API 상태 확인
 curl http://localhost:8080/health
-# → {"status":"ok","services":{"database":"connected","vllm":"connected"}}
+# → {"status":"healthy","service":"vLLM Chat Gateway","version":"1.0.0"}
 
-# 토큰 발급 테스트
-curl -X POST http://localhost:8080/auth/token \
+# 1. 토큰 발급 테스트 (올바른 엔드포인트와 비밀번호)
+curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"secret"}'
-# → {"access_token":"eyJ...","token_type":"bearer"}
+  -d '{"username":"admin","password":"admin123"}'
+# → {"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...","token_type":"bearer"}
 
-# 인증된 API 호출
+# 2. 인증된 채팅 API 호출
+curl -X POST http://localhost:8080/api/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN_HERE" \
+  -d '{
+    "model": "deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",
+    "messages": [{"role": "user", "content": "안녕하세요!"}],
+    "max_tokens": 50
+  }'
+# → SSE 스트림 응답
+
+# 3. 모델 목록 조회
 curl http://localhost:8080/api/models \
-  -H "Authorization: Bearer eyJ..."
-# → {"models":[...]}
+  -H "Authorization: Bearer YOUR_TOKEN_HERE"
+# → {"models":[{"id":"deepseek-ai/DeepSeek-R1-Distill-Qwen-14B",...}]}
+
+# 4. vLLM 서버 직접 테스트 (인증 불필요)
+curl http://localhost:8000/version
+# → {"version":"0.5.0"}
 ```
 
 ---
@@ -422,44 +441,47 @@ curl http://localhost:8080/api/models \
 - 부하: k6/vegeta로 동시 1→5→10, 5분(p50/p95/에러율)
 - 회귀: 모델·파라미터 변경 시 자동 벤치 실행
 
-### 13.2 서비스 연결 검증 결과 (2024년 실행)
+### 13.2 서비스 연결 검증 결과 (2025년 8월 실행)
 
 #### 헬스 체크 검증
 ```bash
 curl http://localhost:8080/health
-# ✅ 성공: {"status":"ok","services":{"database":"connected","vllm":"connected"}}
+# ✅ 성공: {"status":"healthy","service":"vLLM Chat Gateway","version":"1.0.0"}
 ```
 
-#### JWT 인증 검증
+#### JWT 인증 검증 (수정된 엔드포인트)
 ```bash
-# 토큰 발급
-curl -X POST http://localhost:8080/auth/token \
+# 토큰 발급 (올바른 엔드포인트와 비밀번호)
+curl -X POST http://localhost:8080/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"secret"}'
+  -d '{"username":"admin","password":"admin123"}'
 # ✅ 성공: {"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...","token_type":"bearer"}
 
-# 토큰 검증
-curl -X GET http://localhost:8080/auth/verify \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-# ✅ 성공: {"username":"admin","exp":1640995200}
+# vLLM 직접 테스트
+curl -X POST http://localhost:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"deepseek-ai/DeepSeek-R1-Distill-Qwen-14B","messages":[{"role":"user","content":"안녕하세요"}],"max_tokens":50}'
+# ✅ 성공: 채팅 완성 응답 수신
 ```
 
 #### 보호된 API 엔드포인트 검증
 ```bash
-# 모델 목록 조회 (인증 필요)
-curl http://localhost:8080/api/models \
-  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-# ✅ 성공: 모델 목록 반환
+# 채팅 API (인증 필요)
+curl -X POST http://localhost:8080/api/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -d '{"model":"deepseek-ai/DeepSeek-R1-Distill-Qwen-14B","messages":[{"role":"user","content":"테스트"}],"max_tokens":30}'
+# ✅ 성공: SSE 스트림 응답
 
 # 인증 없이 접근 시도
-curl http://localhost:8080/api/models
+curl http://localhost:8080/api/chat -d '{}'
 # ✅ 예상대로 401 Unauthorized 반환
 ```
 
 #### 하드웨어 모니터링 검증
 - ✅ Gateway 컨테이너에서 nvidia-smi 실행 성공
-- ✅ GPU 정보 수집 및 캐싱 동작 확인
-- ✅ nvidia-smi 실패 시 서비스 실패 모드 정상 동작
+- ✅ GPU 사용률: GPU0/GPU1 각각 87% (21GB/24GB) 
+- ✅ vLLM 모델 정상 로딩 및 응답 확인
 
 ### 13.3 검증된 기능 목록
 - [x] JWT 기반 인증 시스템
