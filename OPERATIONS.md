@@ -140,6 +140,187 @@ fi
 
 ## 🔧 유지보수 작업
 
+### 🎯 모델 관리 운영 가이드 ⭐
+
+#### **일상적인 모델 상태 모니터링**
+```bash
+#!/bin/bash
+# model_health_check.sh
+
+echo "🤖 모델 상태 점검: $(date)"
+
+# 1. 현재 모델 상태 확인
+echo "📊 현재 모델 상태:"
+curl -s http://localhost:8080/api/models/status | jq '{
+  current_profile: .current_profile,
+  status: .status,
+  gpu_memory_used: .hardware_info.gpus[0].memory_used_mb,
+  gpu_memory_total: .hardware_info.gpus[0].memory_total_mb
+}'
+
+# 2. GPU 메모리 사용률 확인
+GPU_USAGE=$(nvidia-smi --query-gpu=memory.used,memory.total --format=csv,noheader,nounits | awk -F, '{print int($1/$2*100)}')
+echo "🖥️ GPU 메모리 사용률: ${GPU_USAGE}%"
+
+# 3. 모델 응답 시간 테스트
+RESPONSE_TIME=$(curl -w "%{time_total}" -s -o /dev/null -X POST http://localhost:8080/api/chat \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer test-token" \
+  -d '{"messages":[{"role":"user","content":"Hi"}],"model":"current","stream":false}')
+
+echo "⚡ 모델 응답 시간: ${RESPONSE_TIME}초"
+
+# 4. 경고 임계값 체크
+if (( $(echo "$RESPONSE_TIME > 5.0" | bc -l) )); then
+    echo "⚠️ 경고: 응답 시간이 느립니다 (${RESPONSE_TIME}초 > 5초)"
+    ./webhook_alert.sh "WARNING" "Model response time slow: ${RESPONSE_TIME}s"
+fi
+
+if [ $GPU_USAGE -gt 95 ]; then
+    echo "🔥 위험: GPU 메모리 부족 (${GPU_USAGE}%)"
+    ./webhook_alert.sh "CRITICAL" "GPU memory critical: ${GPU_USAGE}%"
+fi
+```
+
+#### **모델 전환 운영 절차**
+```bash
+#!/bin/bash  
+# model_switch_procedure.sh
+
+MODEL_ID=$1
+if [ -z "$MODEL_ID" ]; then
+    echo "사용법: $0 <profile_id>"
+    echo "사용 가능한 모델: deepseek-r1-distill-qwen-14b, deepseek-coder-7b, qwen2-7b-instruct"
+    exit 1
+fi
+
+echo "🔄 모델 전환 시작: $MODEL_ID"
+
+# 1. 현재 상태 백업
+CURRENT_STATE=$(curl -s http://localhost:8080/api/models/status)
+echo "$CURRENT_STATE" > "/tmp/model_state_backup_$(date +%Y%m%d_%H%M%S).json"
+
+# 2. 하드웨어 호환성 사전 검증
+echo "🔍 하드웨어 호환성 검증 중..."
+COMPATIBILITY=$(curl -s http://localhost:8080/api/models/hardware-recommendations | jq --arg model "$MODEL_ID" '.compatible_profiles[] | select(.profile_id == $model)')
+
+if [ -z "$COMPATIBILITY" ]; then
+    echo "❌ 오류: $MODEL_ID는 현재 하드웨어와 호환되지 않습니다"
+    exit 1
+fi
+
+# 3. 사용자 확인
+echo "✅ 호환성 확인 완료"
+echo "현재 활성 사용자 수 확인 중..."
+ACTIVE_USERS=$(docker compose exec postgres psql -U $POSTGRES_USER -d $POSTGRES_DB -t -c "SELECT COUNT(DISTINCT user_id) FROM conversations WHERE updated_at > NOW() - INTERVAL '5 minutes';" | xargs)
+echo "📊 활성 사용자: $ACTIVE_USERS명"
+
+if [ "$ACTIVE_USERS" -gt 0 ]; then
+    echo "⚠️ 주의: 현재 $ACTIVE_USERS명이 서비스 사용 중입니다"
+    echo "계속하시겠습니까? (y/N)"
+    read -r CONFIRM
+    if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+        echo "모델 전환 취소됨"
+        exit 0
+    fi
+fi
+
+# 4. 모델 전환 실행
+echo "🚀 모델 전환 요청 전송..."
+SWITCH_RESULT=$(curl -s -X POST http://localhost:8080/api/models/switch \
+    -H "Content-Type: application/json" \
+    -d "{\"profile_id\": \"$MODEL_ID\"}")
+
+echo "📝 전환 응답: $SWITCH_RESULT"
+
+# 5. 전환 완료 대기
+echo "⏳ 모델 로딩 대기 중... (최대 5분)"
+for i in {1..60}; do
+    STATUS=$(curl -s http://localhost:8080/api/models/status | jq -r '.status')
+    if [ "$STATUS" = "running" ]; then
+        echo "✅ 모델 전환 완료! (${i}0초 소요)"
+        break
+    elif [ "$STATUS" = "error" ]; then
+        echo "❌ 모델 전환 실패!"
+        exit 1
+    fi
+    sleep 5
+    echo -n "."
+done
+
+# 6. 전환 완료 검증
+echo ""
+echo "🧪 모델 전환 검증 중..."
+TEST_RESULT=$(curl -s -X POST http://localhost:8080/api/chat \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer test-token" \
+    -d '{"messages":[{"role":"user","content":"안녕하세요"}],"model":"current","stream":false}')
+
+if echo "$TEST_RESULT" | jq -e '.choices[0].message.content' > /dev/null; then
+    echo "✅ 모델 전환 및 테스트 완료!"
+    ./webhook_alert.sh "INFO" "Model switched successfully to: $MODEL_ID"
+else
+    echo "❌ 모델 전환은 완료되었으나 테스트 실패"
+    ./webhook_alert.sh "WARNING" "Model switch completed but test failed: $MODEL_ID"
+fi
+```
+
+#### **모델 관련 트러블슈팅**
+
+**🔥 일반적인 문제와 해결책:**
+
+1. **모델 전환이 멈춤 (5분 이상)**
+```bash
+# 현재 vLLM 프로세스 확인
+docker compose exec vllm ps aux | grep python
+
+# GPU 메모리 상태 확인  
+nvidia-smi
+
+# 강제 재시작 (최후 수단)
+docker compose restart vllm
+sleep 30
+curl http://localhost:8080/api/models/reload  # 프로파일 재로드
+```
+
+2. **GPU 메모리 부족 (CUDA OOM)**
+```bash
+# 현재 메모리 사용량 확인
+nvidia-smi
+
+# 더 작은 모델로 전환
+curl -X POST http://localhost:8080/api/models/switch \
+    -H "Content-Type: application/json" \
+    -d '{"profile_id": "phi3-mini"}'
+
+# VRAM 사용률 조정 (model_profiles.yml)
+# gpu_memory_utilization: 0.85 → 0.7
+```
+
+3. **모델 응답 품질 저하**
+```bash
+# 현재 모델 확인
+curl http://localhost:8080/api/models/status | jq '.current_profile'
+
+# 모델별 권장 매개변수 확인
+curl http://localhost:8080/api/models/profiles | jq '.profiles["current"]["description"]'
+
+# 더 적합한 모델로 전환
+curl http://localhost:8080/api/models/hardware-recommendations | jq '.recommended_profiles'
+```
+
+4. **모델 로딩 실패**
+```bash
+# vLLM 컨테이너 로그 확인
+docker compose logs vllm | tail -50
+
+# 하드웨어 요구사항 재확인
+curl http://localhost:8080/api/models/hardware-recommendations
+
+# model_profiles.yml 문법 검증
+python3 -c "import yaml; yaml.safe_load(open('model_profiles.yml'))"
+```
+
 ### 주간 유지보수 (매주 일요일)
 
 ```bash

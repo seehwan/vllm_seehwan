@@ -220,9 +220,88 @@ VITE_API_BASE_URL=http://localhost:8080
 
 ### API 엔드포인트
 - `POST /api/chat` - 채팅 스트리밍
-- `GET /api/conversations` - 대화 목록
+- `GET /api/conversations` - 대화 목록  
 - `POST /api/conversations` - 새 대화 생성
 - `GET /api/conversations/:id` - 대화 상세
+- `GET /api/models/status` - 🎯 모델 상태 조회 ⭐
+- `GET /api/models/profiles` - 🎯 사용 가능한 모델 목록 ⭐
+- `POST /api/models/switch` - 🎯 모델 전환 ⭐
+
+## 🎯 모델 관리 UI 기능 ⭐
+
+Frontend는 Gateway의 **통합 모델 관리 서비스**와 완전히 연동되어 사용자가 웹에서 직접 모델을 관리할 수 있습니다.
+
+### **핵심 기능**
+
+#### **1️⃣ 실시간 모델 상태 표시**
+```typescript
+// 모델 상태 조회 예제
+const fetchModelStatus = async () => {
+  const response = await fetch(`${API_BASE}/api/models/status`);
+  const data = await response.json();
+  
+  console.log('현재 모델:', data.current_profile);
+  console.log('상태:', data.status); // "running", "switching", "stopped"
+  console.log('GPU 정보:', data.hardware_info);
+};
+```
+
+#### **2️⃣ 모델 선택 드롭다운**
+- **10개 지원 모델** 실시간 목록 표시
+- **하드웨어 호환성** 자동 필터링 (RTX 3090 기준)
+- **추천 모델** 우선 표시 (⭐ 마크)
+- **VRAM 요구사항** 정보 툴팁
+
+#### **3️⃣ 원클릭 모델 전환**
+```typescript
+// 모델 전환 예제
+const switchModel = async (profileId: string) => {
+  const response = await fetch(`${API_BASE}/api/models/switch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile_id: profileId })
+  });
+  
+  const result = await response.json();
+  console.log('전환 시작:', result.message);
+  
+  // 백그라운드에서 전환 진행, 상태 폴링으로 완료 확인
+};
+```
+
+#### **4️⃣ 전환 진행률 표시**
+- **로딩 스피너**: 모델 전환 중 표시
+- **상태 메시지**: "DeepSeek R1 14B 모델 로딩 중..." 
+- **예상 시간**: "약 2-3분 소요"
+- **완료 알림**: "모델 전환 완료! 이제 새 모델로 채팅하세요."
+
+### **UI 컴포넌트 구조**
+```
+src/components/
+├── chat/
+│   ├── ModelSelector.tsx      # 🎯 모델 선택 드롭다운
+│   ├── ModelStatusIndicator.tsx # 🎯 현재 모델 상태 표시
+│   └── ModelSwitchProgress.tsx  # 🎯 전환 진행률 표시
+├── ui/
+│   ├── Select.tsx            # 기본 셀렉트 컴포넌트
+│   ├── Badge.tsx             # 모델 상태 배지
+│   └── Progress.tsx          # 프로그레스 바
+```
+
+### **사용자 경험 (UX) 시나리오**
+
+**📱 일반적인 사용 흐름:**
+1. 사용자가 채팅 페이지 접속
+2. 우상단에 "현재 모델: DeepSeek R1 14B" 표시
+3. 드롭다운 클릭 → 10개 모델 목록 + 호환성 정보  
+4. "DeepSeek Coder 7B" 선택
+5. "모델 전환 중..." 상태 표시 (1-3분)
+6. "전환 완료!" → 새 모델로 채팅 시작
+
+**⚠️ 오류 처리:**
+- 호환되지 않는 모델 선택 시: "현재 하드웨어로 실행할 수 없습니다"
+- 전환 실패시: "모델 전환에 실패했습니다. 이전 모델로 복구됩니다"
+- 네트워크 오류시: "서버 연결을 확인하세요"
 
 ## 🎨 UI/UX 특징
 

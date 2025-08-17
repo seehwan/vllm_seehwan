@@ -46,7 +46,8 @@
 │      React          │ │    FastAPI      │ │   CDN/Storage   │
 │   • SPA UI          │ │ • Authentication│ │  • Images       │
 │   • Real-time Chat  │ │ • Rate Limiting │ │  • Documents    │
-│   • State Mgmt      │ │ • Input Valid.  │ │  • Cache        │
+│   • Model Selection │ │ • 🎯 Model Mgmt │ │  • Cache        │
+│   • State Mgmt      │ │ • Input Valid.  │ │  • Profiles     │
 └─────────────────────┘ └─────────────────┘ └─────────────────┘
                                 │
                                 ▼

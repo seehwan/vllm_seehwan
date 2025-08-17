@@ -1,13 +1,14 @@
+from contextlib import asynccontextmanager
+
+import structlog
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from contextlib import asynccontextmanager
-import structlog
 
 from .config import settings
-from .routers import chat, auth, health, conversations, models
 from .database import init_db
 from .middleware import LoggingMiddleware, RateLimitMiddleware
+from .routers import auth, chat, conversations, health, models
 
 # 로거 설정
 logger = structlog.get_logger()
@@ -20,9 +21,9 @@ async def lifespan(app: FastAPI):
     logger.info("🚀 vLLM Gateway 시작...")
     await init_db()
     logger.info("✅ 데이터베이스 초기화 완료")
-    
+
     yield
-    
+
     # 종료 시
     logger.info("👋 vLLM Gateway 종료")
 
@@ -48,7 +49,7 @@ app.add_middleware(
 
 # 신뢰할 수 있는 호스트 설정
 app.add_middleware(
-    TrustedHostMiddleware, 
+    TrustedHostMiddleware,
     allowed_hosts=settings.ALLOWED_HOSTS
 )
 

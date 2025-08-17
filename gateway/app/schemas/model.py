@@ -1,5 +1,6 @@
+from typing import Any, Optional
+
 from pydantic import BaseModel
-from typing import Dict, Any, Optional, List
 
 
 class ModelProfile(BaseModel):
@@ -12,12 +13,12 @@ class ModelProfile(BaseModel):
     gpu_memory_utilization: float = 0.85
     dtype: str = "float16"
     swap_space: int = 4
-    hardware_requirements: Optional[Dict[str, Any]] = None
+    hardware_requirements: Optional[dict[str, Any]] = None
 
 
 class HardwareInfo(BaseModel):
     """하드웨어 정보 스키마"""
-    gpus: List[Dict[str, Any]]
+    gpus: list[dict[str, Any]]
     gpu_count: int
     total_vram_gb: float
     available_vram_gb: float
@@ -40,6 +41,6 @@ class ModelStatusResponse(BaseModel):
     """모델 상태 응답 스키마"""
     current_profile: Optional[str]
     status: str  # "running", "switching", "stopped", "error"
-    available_profiles: Dict[str, ModelProfile]
+    available_profiles: dict[str, ModelProfile]
     message: Optional[str] = None
-    hardware_info: Optional[Dict[str, Any]] = None
+    hardware_info: Optional[dict[str, Any]] = None

@@ -256,11 +256,36 @@ VITE_DEBUG=true
 
 ```bash
 cd gateway
-python -m venv venv
+
+# Python 가상환경 설정
+python3 -m venv venv
 source venv/bin/activate  # Linux/Mac
 # venv\Scripts\activate   # Windows
+
+# 의존성 설치
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8080
+
+# 환경변수 설정 (.env 파일 생성)
+cat > .env << EOF
+JWT_SECRET=dev-jwt-secret-key-for-vllm-gateway-development-only-change-in-production
+DEBUG=True
+LOG_LEVEL=DEBUG
+VLLM_BASE_URL=http://localhost:8000/v1
+CORS_ORIGINS=["http://localhost:3000"]
+DATABASE_URL=postgresql+asyncpg://chatuser:secure_password_123@localhost:5432/chatdb
+REDIS_URL=redis://localhost:6379/0
+EOF
+
+# 설정 확인
+python -c "from app.config import settings; print('✅ JWT_SECRET 설정됨:', len(settings.JWT_SECRET), '글자')"
+
+# 개발 서버 실행
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+
+# API 테스트
+# 다른 터미널에서:
+# curl http://localhost:8080/
+# curl http://localhost:8080/api/models/status
 ```
 
 ## 🎨 6단계: 커스터마이징

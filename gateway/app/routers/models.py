@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from ..schemas.model import ModelSwitchRequest, ModelSwitchResponse, ModelStatusResponse
-from ..services.model_manager import model_manager
 import logging
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+
+from ..schemas.model import ModelStatusResponse, ModelSwitchRequest, ModelSwitchResponse
+from ..services.model_manager import model_manager
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -35,30 +37,30 @@ async def switch_model(request: ModelSwitchRequest, background_tasks: Background
     """모델 전환 (백그라운드에서 실행)"""
     try:
         profile_id = request.profile_id
-        
+
         if profile_id not in model_manager.profiles:
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail=f"프로파일 '{profile_id}'를 찾을 수 없습니다."
             )
-        
+
         if model_manager.current_profile == profile_id and model_manager.status == "running":
             return ModelSwitchResponse(
                 success=True,
                 message=f"이미 '{profile_id}' 모델이 실행 중입니다.",
                 current_profile=profile_id
             )
-        
+
         # 백그라운드에서 모델 전환 실행
         background_tasks.add_task(model_manager.switch_model, profile_id)
-        
+
         return ModelSwitchResponse(
             success=True,
             message=f"모델 전환을 시작합니다: {model_manager.profiles[profile_id].name}",
             current_profile=model_manager.current_profile,
             switching_to=profile_id
         )
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -73,38 +75,38 @@ async def get_hardware_recommendations():
         hardware_info = await model_manager._get_hardware_info()
         available_vram = hardware_info.get("available_vram_gb", 0)
         gpu_count = hardware_info.get("gpu_count", 0)
-        
+
         recommendations = {
             "current_hardware": hardware_info,
             "recommended_profiles": [],
             "compatible_profiles": [],
             "incompatible_profiles": []
         }
-        
+
         for profile_id, profile in model_manager.profiles.items():
             compatibility = model_manager._check_hardware_compatibility(profile, hardware_info)
-            
+
             profile_info = {
                 "profile_id": profile_id,
                 "name": profile.name,
                 "description": profile.description,
                 "compatibility": compatibility
             }
-            
+
             if compatibility["compatible"]:
                 recommendations["compatible_profiles"].append(profile_info)
-                
+
                 # RTX 3090 기준 추천 로직
                 hardware_reqs = getattr(profile, 'hardware_requirements', {})
                 recommended_vram = hardware_reqs.get('recommended_vram_gb', 0)
-                
+
                 if recommended_vram <= available_vram:
                     recommendations["recommended_profiles"].append(profile_info)
             else:
                 recommendations["incompatible_profiles"].append(profile_info)
-        
+
         return recommendations
-        
+
     except Exception as e:
         logger.error(f"하드웨어 추천 실패: {e}")
         raise HTTPException(status_code=500, detail="하드웨어 추천 조회 실패")
