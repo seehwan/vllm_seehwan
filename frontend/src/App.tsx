@@ -42,9 +42,30 @@ function App() {
         </header>
 
         {/* 아래쪽 - 좌우 분할 */}
-        <main className="flex gap-6 flex-1 min-h-0 overflow-hidden">
+        <main 
+          className="main-layout"
+          style={{
+            display: 'flex',
+            flexDirection: 'row',
+            gap: '1.5rem',
+            flex: 1,
+            minHeight: 0,
+            overflow: 'hidden'
+          }}
+        >
           {/* 아래쪽-왼쪽 - 모델 선택 패널 */}
-          <div className="w-80 flex-shrink-0 h-full overflow-hidden">
+          <div 
+            className="sidebar-panel"
+            style={{
+              width: '320px',
+              flexShrink: 0,
+              height: '100%',
+              overflow: 'hidden',
+              background: 'white',
+              borderRadius: '0.5rem',
+              boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)'
+            }}
+          >
             <ModelSelector 
               onModelChange={handleModelChange} 
               selectedModel={selectedModel}
@@ -52,7 +73,17 @@ function App() {
           </div>
 
           {/* 아래쪽-오른쪽 - 채팅창 */}
-          <div className="flex-1 h-full overflow-hidden">
+          <div 
+            className="chat-panel"
+            style={{
+              flex: 1,
+              height: '100%',
+              overflow: 'hidden',
+              background: 'white',
+              borderRadius: '0.5rem',
+              boxShadow: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)'
+            }}
+          >
             <ChatArea
               messages={messages}
               isLoading={isLoading}
