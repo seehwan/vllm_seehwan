@@ -224,9 +224,32 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up frontend gatew
 
 ```bash
 cd frontend
+
+# Node.js 버전 확인 (18+ 필요)
+node --version
+
+# TypeScript 환경 설정 확인
+# vite-env.d.ts, tsconfig.json 파일이 있는지 확인
+ls vite-env.d.ts tsconfig.json
+
+# 패키지 설치
 npm install
+
+# TypeScript 컴파일 확인
+npx tsc --noEmit
+
+# 개발 서버 실행
 npm run dev
 # http://localhost:3000에서 개발
+
+# TypeScript 오류 시 VS Code에서:
+# Ctrl+Shift+P → "TypeScript: Restart TS Server"
+```
+
+**환경 변수 설정 (`.env.local`):**
+```bash
+VITE_API_BASE_URL=http://localhost:8080
+VITE_DEBUG=true
 ```
 
 #### Gateway 로컬 개발

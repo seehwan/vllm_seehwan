@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { ModelProfile } from '../types/model';
 import { useModel } from '../hooks/useModel';
 
 interface ModelSelectorProps {

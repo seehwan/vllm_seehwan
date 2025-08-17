@@ -38,15 +38,105 @@ React + Vite 기반의 vLLM 챗봇 서비스 프론트엔드입니다.
 - Node.js 18+ 
 - npm 또는 yarn
 
+### 초기 설정
+
+#### 1. TypeScript 환경 설정
+프로젝트에 필요한 TypeScript 설정 파일들을 생성하세요:
+
+**`vite-env.d.ts` (Vite 환경 변수 타입 선언):**
+```typescript
+/// <reference types="vite/client" />
+
+interface ImportMetaEnv {
+  readonly VITE_API_BASE_URL: string
+  readonly VITE_WS_URL?: string
+  readonly VITE_DEBUG?: string
+}
+
+interface ImportMeta {
+  readonly env: ImportMetaEnv
+}
+```
+
+**`tsconfig.json` (TypeScript 컴파일러 설정):**
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "types": ["vite/client"]
+  },
+  "include": [
+    "src",
+    "vite-env.d.ts"
+  ],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}
+```
+
+**`tsconfig.node.json` (Vite 설정 파일용):**
+```json
+{
+  "compilerOptions": {
+    "composite": true,
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true
+  },
+  "include": ["vite.config.ts"]
+}
+```
+
+#### 2. 환경 변수 설정
+`.env.local` 파일을 생성하여 환경 변수를 설정하세요:
+```bash
+VITE_API_BASE_URL=http://localhost:8080
+VITE_DEBUG=true
+```
+
 ### 로컬 개발 서버 실행
 ```bash
 # 패키지 설치
 npm install
 
+# TypeScript 컴파일 확인
+npx tsc --noEmit
+
 # 개발 서버 실행
 npm run dev
 
 # 브라우저에서 http://localhost:3000 접속
+```
+
+### 문제 해결
+
+#### `import.meta.env` 타입 오류
+- `vite-env.d.ts` 파일이 존재하는지 확인
+- VS Code에서 TypeScript 서버 재시작: `Ctrl+Shift+P` → "TypeScript: Restart TS Server"
+
+#### Node.js 버전 문제
+```bash
+# Node.js 버전 확인
+node --version
+
+# 최신 LTS 버전 설치 (nvm 사용)
+nvm install --lts
+nvm use --lts
 ```
 
 ### Docker 환경에서 실행
