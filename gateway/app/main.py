@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 import structlog
 
 from .config import settings
-from .routers import chat, auth, health, conversations
+from .routers import chat, auth, health, conversations, models
 from .database import init_db
 from .middleware import LoggingMiddleware, RateLimitMiddleware
 
@@ -61,6 +61,7 @@ app.include_router(health.router, tags=["Health"])
 app.include_router(auth.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(chat.router, prefix="/api", tags=["Chat"])
 app.include_router(conversations.router, prefix="/api", tags=["Conversations"])
+app.include_router(models.router, prefix="/api", tags=["Models"])
 
 
 @app.get("/")
