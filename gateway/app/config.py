@@ -1,5 +1,6 @@
 
 from pydantic_settings import BaseSettings
+import os
 
 
 class Settings(BaseSettings):
@@ -19,9 +20,13 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 24
 
-    # CORS 설정
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    # CORS 설정 - 환경 변수에서 직접 가져옴
     ALLOWED_HOSTS: list[str] = ["*"]
+    
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """CORS origins를 리스트로 변환"""
+        return ["http://localhost:3000", "http://localhost:80", "http://localhost"]
 
     # 데이터베이스 설정
     DATABASE_URL: str = "postgresql+asyncpg://user:pass@localhost/chatdb"
@@ -40,8 +45,10 @@ class Settings(BaseSettings):
     PROMETHEUS_PORT: int = 9090
 
     class Config:
-        env_file = ".env"
+        env_file = "../.env.local"  # 프로젝트 루트의 .env.local 파일 사용
         case_sensitive = True
+        # CORS_ORIGINS 필드는 환경 변수에서 제외
+        env_ignore = {'CORS_ORIGINS'}
 
 
 # 설정 인스턴스 생성

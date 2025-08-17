@@ -5,14 +5,17 @@ services:
     image: vllm/vllm-openai:v0.5.0
     container_name: vllm-server
     restart: "no"  # 모델 전환 시 수동 재시작을 위해 변경
-    ports:
-      - '${VLLM_PORT}:8000'
+    ipc: host
+    shm_size: '2gb'
+    network_mode: host
     volumes:
       - ~/.cache/huggingface:/root/.cache/huggingface
       - ./models:/models
       - ./model_profiles.yml:/app/model_profiles.yml:ro
     environment:
       - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
+      - NCCL_DEBUG=INFO
+      - CUDA_VISIBLE_DEVICES=0,1
     command: >
       --model ${MODEL_ID}
       --dtype ${VLLM_DTYPE:-float16}
@@ -46,12 +49,13 @@ services:
       - ./model_profiles.yml:/app/model_profiles.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro  # Docker 컨테이너 제어를 위해 추가
     environment:
-      - VLLM_BASE_URL=http://vllm:8000/v1
+      - VLLM_BASE_URL=${VLLM_BASE_URL}
       - JWT_SECRET=${JWT_SECRET}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}/${POSTGRES_DB}
       - REDIS_URL=${REDIS_URL}
-      - CORS_ORIGINS=${CORS_ORIGINS}
       - LOG_LEVEL=${LOG_LEVEL}
+      - DEBUG=${DEBUG}
+      - ENVIRONMENT=${ENVIRONMENT}
     depends_on:
       - vllm
       - postgres
