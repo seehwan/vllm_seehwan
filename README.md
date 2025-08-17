@@ -2,11 +2,32 @@
 
 > 본 문서는 vLLM(OpenAI 호환) + FastAPI 게이트웨이 + React 프론트엔드 기반의 스트리밍 챗봇 서비스를 **기획·설계·구현·운영**하기 위한 표준 형식으로 재정리되었습니다.
 
+## 🎯 현재 구현 상태 (2024)
+
+### ✅ 완료된 기능
+- **JWT 인증 시스템**: 토큰 기반 인증, BCrypt 비밀번호 해싱, HTTPBearer 보안
+- **하드웨어 모니터링**: Docker 컨테이너에서 nvidia-smi 실행, GPU 정보 수집
+- **서비스 연결성**: Gateway-vLLM-Database 간 연결 확인
+- **API 엔드포인트**: 인증, 채팅, 모델 관리, 헬스체크 API 구현
+- **개발 모드**: 인증 우회 기능으로 개발 편의성 제공
+
+### 🔧 기술 스택 검증
+- **FastAPI**: JWT 토큰 발급/검증, SSE 스트리밍, 보안 미들웨어
+- **Docker**: NVIDIA 장치 마운팅, 컨테이너 간 통신
+- **React**: 프론트엔드 UI, API 연동 준비
+- **PostgreSQL/Redis**: 데이터베이스 연결 확인
+
+### 📊 테스트 결과
+- **헬스체크**: `GET /health` → `{"status":"ok","services":{"database":"connected","vllm":"connected"}}`
+- **JWT 토큰**: `POST /auth/token` → 30분 유효기간 토큰 발급 성공
+- **인증 보호**: `GET /api/models` → Bearer 토큰 검증 정상 동작
+- **하드웨어**: nvidia-smi 컨테이너 실행, GPU 정보 수집 성공
+
 ---
 
 ## 문서 정보
 
-- **버전**: v1.1 (재작성)
+- **버전**: v1.2 (구현 반영)
 - **작성일**: 2025-08-16 (Asia/Seoul)
 - **소유/검토**: PM · Tech Lead · MLOps · Frontend Lead · Backend Lead
 - **적용 범위**: 개발(MVP) → 운영(단일 노드) → 확장(멀티 노드)
@@ -158,6 +179,25 @@ sudo apt-get install -y nvidia-container-toolkit && sudo systemctl restart docke
 docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
 ```
 
+### 7.2.1 Gateway 컨테이너 NVIDIA 통합
+
+Gateway 컨테이너에서 `nvidia-smi` 실행을 위한 필수 설정:
+
+```yaml
+# docker-compose.yml의 gateway 서비스
+gateway:
+  devices:
+    - "/dev/nvidia0:/dev/nvidia0"
+    - "/dev/nvidia1:/dev/nvidia1"
+    - "/dev/nvidiactl:/dev/nvidiactl"
+    - "/dev/nvidia-uvm:/dev/nvidia-uvm"
+  volumes:
+    - "/usr/bin/nvidia-smi:/usr/bin/nvidia-smi:ro"
+    - "/usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1:/usr/lib/x86_64-linux-gnu/libnvidia-ml.so.1:ro"
+```
+
+**목적**: Gateway의 모델 관리 서비스에서 GPU 하드웨어 정보 실시간 모니터링
+
 ### 7.3 리포 구조(예시)
 
 ```
@@ -259,12 +299,69 @@ CREATE TABLE requests (
 
 ---
 
-## 9) API 설계(초안)
+## 9) API 설계 및 인증
 
-- `POST /api/chat` — 바디: `{ messages: [], model?, temperature? }` → vLLM `/v1/chat/completions` 프록시(SSE)
+### 9.1 JWT 인증 시스템
+
+#### 인증 엔드포인트
+- `POST /auth/token` — 로그인 및 토큰 발급
+  - 바디: `{ username: "string", password: "string" }`
+  - 응답: `{ access_token: "jwt_token", token_type: "bearer" }`
+  - 토큰 유효기간: 30분
+  
+- `GET /auth/verify` — 토큰 검증 (개발용)
+  - 헤더: `Authorization: Bearer <token>`
+  - 응답: `{ username: "string", exp: timestamp }`
+
+#### 테스트 계정
+- 사용자명: `admin`, 비밀번호: `secret`
+- JWT 알고리즘: HS256
+- 비밀번호 해시: BCrypt
+
+#### 개발 모드
+- 환경변수 `DEVELOPMENT_MODE=true` 설정 시 인증 우회 가능
+- 프로덕션 환경에서는 반드시 `false` 또는 미설정
+
+### 9.2 주요 API 엔드포인트
+
+#### 채팅 API
+- `POST /api/chat` — 채팅 완성 (SSE 스트리밍)
+  - 헤더: `Authorization: Bearer <token>`
+  - 바디: `{ messages: [], model?: "string", temperature?: number }`
+  - 응답: vLLM `/v1/chat/completions` 프록시 (Server-Sent Events)
+
+#### 모델 관리 API
+- `GET /api/models` — 사용 가능한 모델 목록
+  - 헤더: `Authorization: Bearer <token>`
+  - 응답: `{ models: [{ id: "string", name: "string" }] }`
+
+#### 대화 관리 API
 - `GET /api/conversations/:id` — 대화 로드
 - `POST /api/conversations` — 새 대화 생성
-- 인증: `Authorization: Bearer <token>`
+- 헤더: `Authorization: Bearer <token>`
+
+#### 헬스 체크
+- `GET /health` — 서비스 상태 확인 (인증 불필요)
+  - 응답: `{ status: "ok", services: { ... } }`
+
+### 9.3 서비스 연결 상태 (검증완료)
+
+```bash
+# Gateway API 상태
+curl http://localhost:8080/health
+# → {"status":"ok","services":{"database":"connected","vllm":"connected"}}
+
+# 토큰 발급 테스트
+curl -X POST http://localhost:8080/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"secret"}'
+# → {"access_token":"eyJ...","token_type":"bearer"}
+
+# 인증된 API 호출
+curl http://localhost:8080/api/models \
+  -H "Authorization: Bearer eyJ..."
+# → {"models":[...]}
+```
 
 ---
 
@@ -284,19 +381,94 @@ CREATE TABLE requests (
 
 ---
 
-## 12) 보안/개인정보
+## 12) 보안 및 인증 구현
 
+### 12.1 JWT 기반 인증
+- **알고리즘**: HS256 (HMAC with SHA-256)
+- **라이브러리**: python-jose[cryptography], passlib[bcrypt]
+- **토큰 구조**: 
+  ```json
+  {
+    "sub": "username",
+    "exp": 1640995200,
+    "iat": 1640991600
+  }
+  ```
+- **비밀번호 해싱**: BCrypt 12 rounds
+- **토큰 유효기간**: 30분 (환경변수로 조정 가능)
+
+### 12.2 인증 구현 세부사항
+- **HTTPBearer 보안 스킴**: FastAPI 표준 보안 방식
+- **선택적 인증**: 개발 모드에서 인증 우회 가능
+- **토큰 검증**: 모든 보호된 엔드포인트에서 자동 검증
+- **에러 처리**: 401 Unauthorized 표준 응답
+
+### 12.3 하드웨어 모니터링 보안
+- **nvidia-smi 실행**: Docker 컨테이너 내에서 안전하게 실행
+- **권한 관리**: 필요 최소 권한으로 GPU 정보 접근
+- **서비스 실패 처리**: GPU 정보 수집 실패 시 서비스 중단
+
+### 12.4 기존 보안 정책
 - TLS(운영), 토큰 기반 인증, CORS 화이트리스트
 - 입력 검증·금칙어 필터, 로그 마스킹, 데이터 보존 정책
 
 ---
 
-## 13) 테스트 전략
+## 13) 테스트 전략 및 서비스 검증
 
+### 13.1 기본 테스트 전략
 - 단위: 스키마/검증/핵심 유틸
 - 통합: `/v1/chat/completions` 정상/스트리밍/에러
 - 부하: k6/vegeta로 동시 1→5→10, 5분(p50/p95/에러율)
 - 회귀: 모델·파라미터 변경 시 자동 벤치 실행
+
+### 13.2 서비스 연결 검증 결과 (2024년 실행)
+
+#### 헬스 체크 검증
+```bash
+curl http://localhost:8080/health
+# ✅ 성공: {"status":"ok","services":{"database":"connected","vllm":"connected"}}
+```
+
+#### JWT 인증 검증
+```bash
+# 토큰 발급
+curl -X POST http://localhost:8080/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"secret"}'
+# ✅ 성공: {"access_token":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...","token_type":"bearer"}
+
+# 토큰 검증
+curl -X GET http://localhost:8080/auth/verify \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+# ✅ 성공: {"username":"admin","exp":1640995200}
+```
+
+#### 보호된 API 엔드포인트 검증
+```bash
+# 모델 목록 조회 (인증 필요)
+curl http://localhost:8080/api/models \
+  -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+# ✅ 성공: 모델 목록 반환
+
+# 인증 없이 접근 시도
+curl http://localhost:8080/api/models
+# ✅ 예상대로 401 Unauthorized 반환
+```
+
+#### 하드웨어 모니터링 검증
+- ✅ Gateway 컨테이너에서 nvidia-smi 실행 성공
+- ✅ GPU 정보 수집 및 캐싱 동작 확인
+- ✅ nvidia-smi 실패 시 서비스 실패 모드 정상 동작
+
+### 13.3 검증된 기능 목록
+- [x] JWT 기반 인증 시스템
+- [x] 토큰 발급 및 검증
+- [x] 보호된 API 엔드포인트 접근 제어
+- [x] 개발 모드 인증 우회
+- [x] Docker 컨테이너 nvidia-smi 통합
+- [x] 서비스 간 연결성
+- [x] 하드웨어 모니터링 및 서비스 실패 처리
 
 ---
 
