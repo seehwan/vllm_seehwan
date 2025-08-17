@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useModel } from '../hooks/useModel';
+import { ChevronDown, Check, Info } from 'lucide-react';
 
 interface ModelSelectorProps {
   onModelChange?: (profileId: string) => void;
+  selectedModel: string | null;
 }
 
-const ModelSelector: React.FC<ModelSelectorProps> = ({ onModelChange }) => {
+const ModelSelector: React.FC<ModelSelectorProps> = ({ onModelChange, selectedModel }) => {
   const { modelStatus, switching, switchModel } = useModel();
   const [selectedProfile, setSelectedProfile] = useState<string>('');
+  const [expandedProfile, setExpandedProfile] = useState<string | null>(null);
 
   const handleModelSwitch = async (profileId: string) => {
     const result = await switchModel(profileId);
@@ -63,13 +66,14 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onModelChange }) => {
   }
 
   return (
-    <div className="p-4 bg-white border rounded-lg shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-gray-900">모델 선택</h3>
-        <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(modelStatus.status)}`}>
-          {getStatusText(modelStatus.status)}
+    <div className="h-full bg-white border rounded-lg shadow-sm overflow-hidden">
+      <div className="p-4 border-b bg-gray-50">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-gray-900">모델 선택</h3>
+          <div className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(modelStatus.status)}`}>
+            {getStatusText(modelStatus.status)}
+          </div>
         </div>
-      </div>
 
       {modelStatus.current_profile && (
         <div className="mb-4 p-3 bg-blue-50 rounded-md">
@@ -79,49 +83,118 @@ const ModelSelector: React.FC<ModelSelectorProps> = ({ onModelChange }) => {
           <div className="text-xs text-blue-600 mt-1">
             {modelStatus.available_profiles[modelStatus.current_profile]?.description}
           </div>
+          {selectedModel === modelStatus.current_profile && (
+            <div className="mt-2 text-xs text-blue-600">
+              ✅ 채팅에서 사용 중
+            </div>
+          )}
         </div>
       )}
 
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          사용할 모델을 선택하세요:
-        </label>
+      <div className="p-4 overflow-y-auto max-h-[calc(100vh-300px)]">
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            사용할 모델을 선택하세요:
+          </label>
         
         {Object.entries(modelStatus.available_profiles).map(([profileId, profile]) => (
           <div
             key={profileId}
-            className={`p-3 border rounded-md cursor-pointer transition-colors ${
+            className={`border rounded-md transition-colors ${
               modelStatus.current_profile === profileId
                 ? 'border-blue-500 bg-blue-50'
                 : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
             }`}
-            onClick={() => {
-              if (modelStatus.current_profile !== profileId && !switching) {
-                handleModelSwitch(profileId);
-              }
-            }}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <div className="font-medium text-gray-900">{profile.name}</div>
-                <div className="text-sm text-gray-600">{profile.description}</div>
-                <div className="text-xs text-gray-500 mt-1">
-                  모델 ID: {profile.model_id}
+            <div
+              className="p-3 cursor-pointer"
+              onClick={() => {
+                if (modelStatus.current_profile !== profileId && !switching) {
+                  handleModelSwitch(profileId);
+                }
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="font-medium text-gray-900">{profile.name}</div>
+                  <div className="text-sm text-gray-600">{profile.description}</div>
+                  <div className="text-xs text-gray-500 mt-1">
+                    모델 ID: {profile.model_id}
+                  </div>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  {modelStatus.current_profile === profileId && (
+                    <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
+                      현재 사용 중
+                    </span>
+                  )}
+                  
+                  {switching && selectedProfile === profileId && (
+                    <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                  )}
+                  
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpandedProfile(expandedProfile === profileId ? null : profileId);
+                    }}
+                    className="p-1 hover:bg-gray-200 rounded transition-colors"
+                  >
+                    <ChevronDown 
+                      className={`w-4 h-4 transition-transform ${
+                        expandedProfile === profileId ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </button>
                 </div>
               </div>
-              
-              <div className="flex items-center space-x-2">
-                {modelStatus.current_profile === profileId && (
-                  <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                    현재 사용 중
-                  </span>
+            </div>
+            
+            {/* 확장된 상세 정보 */}
+            {expandedProfile === profileId && (
+              <div className="px-3 pb-3 border-t border-gray-200 bg-gray-50">
+                <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+                  <div className="flex items-center space-x-1">
+                    <Info className="w-3 h-3 text-gray-500" />
+                    <span className="text-gray-600">최대 길이:</span>
+                    <span className="font-medium">{profile.max_model_len.toLocaleString()}</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Info className="w-3 h-3 text-gray-500" />
+                    <span className="text-gray-600">GPU 병렬:</span>
+                    <span className="font-medium">{profile.tensor_parallel_size}</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Info className="w-3 h-3 text-gray-500" />
+                    <span className="text-gray-600">메모리 사용:</span>
+                    <span className="font-medium">{Math.round(profile.gpu_memory_utilization * 100)}%</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Info className="w-3 h-3 text-gray-500" />
+                    <span className="text-gray-600">데이터 타입:</span>
+                    <span className="font-medium">{profile.dtype}</span>
+                  </div>
+                </div>
+                
+                {/* 채팅에서 사용 버튼 */}
+                {modelStatus.current_profile === profileId && selectedModel !== profileId && (
+                  <button
+                    onClick={() => onModelChange?.(profileId)}
+                    className="mt-2 w-full px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600 transition-colors"
+                  >
+                    채팅에서 사용
+                  </button>
                 )}
                 
-                {switching && selectedProfile === profileId && (
-                  <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+                {selectedModel === profileId && (
+                  <div className="mt-2 text-xs text-green-600 bg-green-100 px-2 py-1 rounded text-center">
+                    <Check className="w-3 h-3 inline mr-1" />
+                    채팅에서 사용 중
+                  </div>
                 )}
               </div>
-            </div>
+            )}
           </div>
         ))}
       </div>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ModelStatus, ModelSwitchRequest } from '../types/model';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export const useModel = () => {
   const [modelStatus, setModelStatus] = useState<ModelStatus | null>(null);
