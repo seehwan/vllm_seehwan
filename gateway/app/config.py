@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRE_HOURS: int = 24
 
+    # Google OAuth 설정
+    GOOGLE_CLIENT_ID: str = ""
+    GOOGLE_CLIENT_SECRET: str = ""
+    GOOGLE_REDIRECT_URI: str = "http://localhost:8080/api/auth/google/callback"
+    FRONTEND_URL: str = "http://localhost:3000"
+
     # CORS 설정 - 환경 변수에서 직접 가져옴
     ALLOWED_HOSTS: list[str] = ["*"]
     

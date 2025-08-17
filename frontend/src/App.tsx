@@ -1,11 +1,14 @@
 import { useEffect } from 'react'
 import ModelSelector from './components/ModelSelector'
 import ChatArea from './components/ChatArea'
+import { SimpleLogin } from './components/SimpleLogin'
 import { useChat } from './hooks/useChat'
 import { useModel } from './hooks/useModel'
+import { useAuth } from './hooks/useAuth'
 import './App.css'
 
 function App() {
+  const { isAuthenticated, isLoading: authLoading, user, login, logout } = useAuth();
   const { modelStatus } = useModel();
   const {
     messages,
@@ -28,17 +31,49 @@ function App() {
     }
   }, [modelStatus?.current_profile, selectedModel, setModel]);
 
+  // 인증 로딩 중
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">인증 상태 확인 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 인증되지 않은 경우
+  if (!isAuthenticated) {
+    return <SimpleLogin onLogin={login} />;
+  }
+
   return (
     <div className="App h-screen bg-gray-50 flex flex-col overflow-hidden">
       <div className="container mx-auto p-4 h-full flex flex-col">
         {/* 위쪽 - 타이틀 */}
         <header className="mb-6 flex-shrink-0">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            vLLM Chat Assistant
-          </h1>
-          <p className="text-gray-600">
-            AI 모델을 선택하고 대화를 시작하세요
-          </p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                vLLM Chat Assistant
+              </h1>
+              <p className="text-gray-600">
+                AI 모델을 선택하고 대화를 시작하세요
+              </p>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-gray-600">
+                {user?.username}님 환영합니다!
+              </span>
+              <button
+                onClick={logout}
+                className="text-sm text-red-600 hover:text-red-800"
+              >
+                로그아웃
+              </button>
+            </div>
+          </div>
         </header>
 
         {/* 아래쪽 - 좌우 분할 */}
