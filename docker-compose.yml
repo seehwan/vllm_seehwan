@@ -5,6 +5,8 @@ services:
     image: vllm/vllm-openai:v0.5.0
     container_name: vllm-server
     restart: "no"  # 모델 전환 시 수동 재시작을 위해 변경
+    env_file:
+      - .env.local
     ipc: host
     shm_size: '2gb'
     ports:
@@ -14,7 +16,6 @@ services:
       - ./models:/models
       - ./model_profiles.yml:/app/model_profiles.yml:ro
     environment:
-      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
       - NCCL_DEBUG=INFO
       - CUDA_VISIBLE_DEVICES=0,1
     command: >
@@ -44,6 +45,8 @@ services:
     build: ./gateway
     container_name: fastapi-gateway
     restart: unless-stopped
+    env_file:
+      - .env.local
     ports:
       - '${GATEWAY_PORT}:8080'
     volumes:
@@ -80,6 +83,8 @@ services:
     build: ./frontend
     container_name: react-frontend
     restart: unless-stopped
+    env_file:
+      - .env.local
     ports:
       - '${FRONTEND_PORT}:3000'
     environment:
