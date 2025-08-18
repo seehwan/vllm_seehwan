@@ -1,0 +1,6 @@
+#!/bin/bash
+# vLLM 챗봇 시스템 로그 확인
+# 사용법: ./logs [service_name] [options]
+
+cd "$(dirname "$0")"
+./scripts/logs.sh "$@"

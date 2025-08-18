@@ -94,3 +94,10 @@ temp/
 package-lock.json
 yarn.lock
 Pipfile.lock
+
+# k6 binary (should be installed system-wide)
+k6/k6
+
+# Additional patterns
+*.pid
+nohup.out

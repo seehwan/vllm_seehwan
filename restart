@@ -1,0 +1,7 @@
+#!/bin/bash
+# vLLM 챗봇 시스템 재시작
+# 사용법: ./restart [profile_name]
+
+cd "$(dirname "$0")"
+echo "🔄 시스템 재시작 중..."
+./scripts/restart.sh "$@"

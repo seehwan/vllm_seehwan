@@ -1,3 +1,6 @@
 #!/bin/bash
 # vLLM 챗봇 시스템 정지
-./scripts/stop.sh
+# 사용법: ./stop
+
+cd "$(dirname "$0")"
+./scripts/stop.sh "$@"
