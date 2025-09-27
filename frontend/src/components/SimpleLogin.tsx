@@ -15,7 +15,7 @@ export const SimpleLogin: React.FC<SimpleLoginProps> = ({ onLogin }) => {
     setError(null);
 
     try {
-      // 패스워드를 Base64로 인코딩
+      // 비밀번호를 Base64로 인코딩하여 전송
       const encodedCredentials = {
         username: credentials.username,
         password: btoa(credentials.password) // Base64 인코딩

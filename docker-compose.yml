@@ -46,7 +46,7 @@ services:
     env_file:
       - .env.local
     ports:
-      - '${GATEWAY_PORT}:8080'
+      - "8080:8080"
     volumes:
       - ./model_profiles.yml:/app/model_profiles.yml:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro  # Docker 컨테이너 제어를 위해 추가
@@ -67,6 +67,18 @@ services:
       - LOG_LEVEL=${LOG_LEVEL}
       - DEBUG=${DEBUG}
       - ENVIRONMENT=${ENVIRONMENT}
+      # bcrypt 환경 변수 설정
+      - PASSLIB_CONTEXT_SCHEMES=pbkdf2_sha256
+      - PASSLIB_CONTEXT_DEFAULT=pbkdf2_sha256
+      - PASSLIB_CONTEXT_PBKDF2_SHA256__ROUNDS=29000
+      - PASSLIB_CONTEXT_PBKDF2_SHA256__SALT_SIZE=16
+      # Python 환경 변수로 bcrypt 비활성화
+      - PYTHONPATH=/app
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      # bcrypt 관련 환경 변수
+      - PASSLIB_BCRYPT_DISABLE=1
+      - PASSLIB_DISABLE_BCRYPT=1
     depends_on:
       - vllm
       - postgres
@@ -84,7 +96,7 @@ services:
     env_file:
       - .env.local
     ports:
-      - '${FRONTEND_PORT}:3000'
+      - "3000:3000"
     environment:
       - VITE_API_BASE_URL=http://localhost:${GATEWAY_PORT}
     depends_on:

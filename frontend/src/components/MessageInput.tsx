@@ -29,7 +29,9 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('MessageInput handleSubmit called with:', message.trim());
     if (message.trim() && !disabled) {
+      console.log('Calling onSendMessage with:', message.trim());
       onSendMessage(message.trim());
       setMessage('');
     }

@@ -8,7 +8,7 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from .config import settings
 from .database import init_db
 from .middleware import LoggingMiddleware, RateLimitMiddleware
-from .routers import auth, chat, conversations, health, models
+from .routers import chat, conversations, health, models, auth
 
 # 로거 설정
 logger = structlog.get_logger()

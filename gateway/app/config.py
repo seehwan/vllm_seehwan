@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         """CORS origins를 리스트로 변환"""
-        return ["http://localhost:3000", "http://localhost:80", "http://localhost"]
+        return ["*"]  # 모든 Origin 허용 (개발 환경에서만 사용)
 
     # 데이터베이스 설정
     DATABASE_URL: str = "postgresql+asyncpg://user:pass@localhost/chatdb"
@@ -46,6 +46,7 @@ class Settings(BaseSettings):
 
     # 로깅 설정
     LOG_LEVEL: str = "INFO"
+    ENVIRONMENT: str = "development"
 
     # 모니터링 설정
     PROMETHEUS_PORT: int = 9090
@@ -53,6 +54,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = "../.env.local"  # 프로젝트 루트의 .env.local 파일 사용
         case_sensitive = True
+        extra = "ignore"  # 추가 환경 변수 무시
         # CORS_ORIGINS 필드는 환경 변수에서 제외
         env_ignore = {'CORS_ORIGINS'}
 

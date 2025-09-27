@@ -8,6 +8,7 @@ import { useAuth } from './hooks/useAuth'
 import './App.css'
 
 function App() {
+  console.log('App component loaded!');
   const { isAuthenticated, isLoading: authLoading, user, login, logout } = useAuth();
   const { modelStatus } = useModel();
   const {

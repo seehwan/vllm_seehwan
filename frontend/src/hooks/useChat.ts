@@ -4,6 +4,8 @@ import { Message, ChatRequest, ChatState } from '../types/chat';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export const useChat = () => {
+  console.log('useChat hook initialized!');
+  console.log('API_BASE_URL:', API_BASE_URL);
   const [chatState, setChatState] = useState<ChatState>({
     messages: [],
     isLoading: false,
@@ -13,11 +15,26 @@ export const useChat = () => {
 
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // 프로파일 ID에서 실제 모델 ID 가져오기
+  const getActualModelId = async (profileId: string): Promise<string | null> => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/models/status`);
+      if (response.ok) {
+        const data = await response.json();
+        const profile = data.available_profiles?.[profileId];
+        return profile?.model_id || null;
+      }
+    } catch (error) {
+      console.error('모델 ID 조회 실패:', error);
+    }
+    return null;
+  };
+
   // 메시지 추가
   const addMessage = useCallback((message: Omit<Message, 'id' | 'timestamp'>) => {
     const newMessage: Message = {
       ...message,
-      id: Date.now().toString(),
+      id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
       timestamp: new Date(),
     };
 
@@ -41,21 +58,35 @@ export const useChat = () => {
 
   // 채팅 요청 전송
   const sendMessage = useCallback(async (content: string, model?: string) => {
+    console.log('sendMessage called with content:', content);
     if (!content.trim()) return;
+
+    // 실제 모델 ID 가져오기
+    const profileId = model || chatState.selectedModel;
+    const actualModelId = profileId ? await getActualModelId(profileId) : null;
+    
+    if (!actualModelId) {
+      setChatState(prev => ({ 
+        ...prev, 
+        error: '모델을 찾을 수 없습니다. 모델을 다시 선택해주세요.' 
+      }));
+      return;
+    }
 
     // 사용자 메시지 추가
     const userMessage = addMessage({
       role: 'user',
       content: content.trim(),
-      model: model || chatState.selectedModel || undefined,
+      model: profileId || undefined,
     });
 
     // 어시스턴트 메시지 준비
     const assistantMessage = addMessage({
       role: 'assistant',
       content: '',
-      model: model || chatState.selectedModel || undefined,
+      model: profileId || undefined,
     });
+    console.log('Assistant message created with ID:', assistantMessage.id);
 
     // 이전 요청 취소
     if (abortControllerRef.current) {
@@ -70,11 +101,19 @@ export const useChat = () => {
     try {
       const request: ChatRequest = {
         messages: [
-          ...chatState.messages,
-          userMessage,
+          // 기존 메시지들을 vLLM 형식으로 변환
+          ...chatState.messages.map(msg => ({
+            role: msg.role,
+            content: msg.content
+          })),
+          // 새 사용자 메시지
+          {
+            role: userMessage.role,
+            content: userMessage.content
+          }
         ],
-        model: model || chatState.selectedModel || undefined,
-        stream: true,
+        model: actualModelId, // 실제 모델 ID 사용
+        stream: false, // 스트리밍 비활성화로 빠른 해결
         temperature: 0.7,
         max_tokens: 2048,
       };
@@ -99,50 +138,13 @@ export const useChat = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // SSE 스트리밍 처리
-      const reader = response.body?.getReader();
-      if (!reader) {
-        throw new Error('Response body not available');
-      }
-
-      let accumulatedContent = '';
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const data = line.slice(6);
-            if (data === '[DONE]') break;
-
-            try {
-              const parsed = JSON.parse(data);
-              if (parsed.choices?.[0]?.delta?.content) {
-                const content = parsed.choices[0].delta.content;
-                accumulatedContent += content;
-                
-                // 어시스턴트 메시지 실시간 업데이트
-                updateMessage(assistantMessage.id, { content: accumulatedContent });
-              }
-            } catch (e) {
-              console.warn('Failed to parse SSE data:', e);
-            }
-          }
-        }
-      }
-
-      // 토큰 정보 업데이트 (있는 경우)
-      if (accumulatedContent) {
-        updateMessage(assistantMessage.id, { 
-          content: accumulatedContent,
-          tokens: accumulatedContent.split(/\s+/).length // 간단한 토큰 계산
-        });
-      }
+      // JSON 응답 처리 (stream: false이므로 항상 JSON)
+      const result = await response.json();
+      const content = result.choices?.[0]?.message?.content || '';
+      updateMessage(assistantMessage.id, { 
+        content: content,
+        tokens: result.usage?.total_tokens || 0
+      });
 
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
