@@ -1,0 +1,17 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# npm을 최신 버전으로 업데이트
+RUN npm install -g npm@latest
+
+# 패키지 파일 복사 및 설치
+COPY package*.json ./
+RUN npm install
+
+# 소스 코드 복사
+COPY . .
+
+# 개발 서버 실행
+EXPOSE 3000
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "3000"]
