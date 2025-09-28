@@ -25,4 +25,7 @@ fi
 # 개발 서버 시작
 echo "프론트엔드 개발 서버 시작 중..."
 echo "접속 주소: https://localhost:3000"
-PORT=3000 npm run dev
+echo "API 프록시: /api -> http://127.0.0.1:8080"
+
+# 포트 3000에서 강제 실행
+npm run dev:3000

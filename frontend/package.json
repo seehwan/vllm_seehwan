@@ -4,6 +4,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:3000": "vite --port 3000",
+    "dev:clean": "pkill -f 'npm run dev' && pkill -f 'vite' && sleep 2 && npm run dev:3000",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
