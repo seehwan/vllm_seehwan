@@ -24,7 +24,7 @@ export const useAuth = () => {
   // 토큰 검증 및 사용자 정보 가져오기
   const validateToken = useCallback(async (token: string) => {
     try {
-      const response = await fetch('/api/auth/me', {
+      const response = await fetch('http://localhost:8080/api/auth/me', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

@@ -21,7 +21,7 @@ export const SimpleLogin: React.FC<SimpleLoginProps> = ({ onLogin }) => {
         password: btoa(credentials.password) // Base64 인코딩
       };
       
-      const response = await fetch('/api/auth/login', {
+      const response = await fetch('http://localhost:8080/api/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
